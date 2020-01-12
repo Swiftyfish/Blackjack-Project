@@ -25,6 +25,7 @@ counts = list(range(-3,4))
 states3 = [(state, count) for state in states1 for count in counts if not (count != 0  and state == ('bust',0))]
 
 get_ind_reduced = dict([(vals, idx) for idx, vals in enumerate(states1)])
+get_state_reduced = dict([(idx, vals) for idx, vals in enumerate(states1)])
 get_ind = dict([(vals, idx) for idx, vals in enumerate(states3)])
 get_state = dict([(idx, vals) for idx, vals in enumerate(states3)])
 
@@ -36,7 +37,7 @@ def init_rewards(model):
         for i in [0,1,2,3,4,5,6,7,8,9,18,19,20]: # Hitting with hand value greater than 17 without ace or hitting on high ace hands
             rewards_matrix[i][rewards_matrix[i] == 0] = 1
         for i in range(28): #reward sticking based on hand value, less than 13 = punishment
-            rewards_matrix[i,i] = (get_state[i][0][0]-12)
+            rewards_matrix[i,i] = (get_state_reduced[i][0]-12)
             if i > 17:
                 rewards_matrix[i,i] -= 0.5 #sticking slightly worse for aces
         for i in [8,9]: #Neutral
@@ -50,7 +51,7 @@ def init_rewards(model):
         
     if model == 3:
         for i in range(28):
-            rewards_matrix[i,i] = (get_state[i][0][0]**2-144)/100
+            rewards_matrix[i,i] = (get_state_reduced[i][0]**2 - 144)/100
             if i > 17:
                 rewards_matrix[i,i] -= 0.5 #sticking slightly worse for aces
         rewards_matrix[:,28] = -1 #Punish going bust
@@ -151,16 +152,6 @@ def hit(deck, hand):
     hand.add_card(deck.deal())
     hand.adjust_for_ace(deck)
     
-#def hit_or_stand(deck, hand, action):
-#    global stand_interrupt
-#
-#    while True:
-#        if action == 'stand':
-#            stand_interrupt = True
-#        elif action == 'hit':
-#            hit(deck,hand)
-#        break
-
 def hit_or_stand(deck, hand, action):
     while True:
         if action == 'stand':
@@ -299,6 +290,5 @@ train(max_iterations, n, learning_rate, greed, discount_factor)
 pd.options.display.float_format = '{:,.4f}'.format   
 q2 = pd.DataFrame({'states':states3,'hit':Q_table[:,0], 'stand':Q_table[:,1]})
 q2
-A = [softmax(row) for row in Q_table]
-play(Q_table, 2, 1000)
-q2.to_csv('Q Table', sep = ',', float_format = '%.4f')
+play(Q_table, 2, 10)
+q2.to_csv('Q Table with count', sep = ',', float_format = '%.4f')

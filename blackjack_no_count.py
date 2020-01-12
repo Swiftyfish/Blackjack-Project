@@ -9,7 +9,6 @@ import numpy as np
 import random
 import pandas as pd
 from tqdm import tqdm
-from scipy.special import softmax
     
 states1 = [(x,0) for x in range(4,22)] + [(x,1) for x in range(12,22)] + [('bust', 0)]       
         
@@ -258,10 +257,10 @@ def play(Q_table, n, num_plays):
 
 #%%
 #tqdm._instances.clear()
-rewards_matrix = init_rewards(3)
+rewards_matrix = init_rewards(3) #Reward matrix selection
 max_iterations = 100000
-greed = 0.9
-discount_factor = 0.5
+greed = 0.9 #How often the agent takes the highest-valued option
+discount_factor = 0.5 # A measure of how far the agent looks into the future to evaluate rewards
 learning_rate = 0.1               
 Q_table = np.zeros((len(states1),2))
 scores = []
