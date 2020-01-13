@@ -19,7 +19,7 @@ from tqdm import tqdm
 from scipy.special import softmax
     
 states1 = [(x,0) for x in range(4,22)] + [(x,1) for x in range(12,22)] + [('bust', 0)]
-counts = list(range(-3,4))
+counts = [x/5 for x in range(-5, 6)]
 
 #states2 = [(x,0,count) for x in range(4,22) for count in counts] + [(x,1,count) for x in range(12,22) for count in counts] + [('bust', 0, 0)]
 states3 = [(state, count) for state in states1 for count in counts if not (count != 0  and state == ('bust',0))]
@@ -76,6 +76,9 @@ class Deck:
     
     def __init__(self, n):
         self.deck=[]
+        self.low_high = 0
+        self.low_high_out = 0
+        self.num_cards = 0
         
         for suit in suits:
             for rank in ranks:
@@ -90,37 +93,30 @@ class Deck:
         random.shuffle(self.deck)
         
     def deal(self):
-        self.deck.pop()
-        return self.deck.pop()
+        self.num_cards = len(self.deck)
+        card = self.deck.pop()
+        if values[card.rank] > 9:
+            self.low_high -= 1
+            
+        elif values[card.rank] < 7:
+            self.low_high += 1
+            
+        self.low_high_out = round(self.low_high/(self.num_cards * 2), 1) * 2
+        
+        return card
     
 class Hand:
-    def __init__(self, n):
+    def __init__(self):
         self.cards = []
-        self.state = ((0, 0), 0)
+        self.state = (0, 0)
         self.value = 0   
         self.aces = 0 
-        self.low_high = 0
-        self.low_high_out = 0
         
     def assign_state(self, deck):
-        remaining_decks = np.ceil(len(list(deck))/52)
-        if remaining_decks == 0:
-            remaining_decks = 1
-        sign = np.sign(self.low_high)
-        val = abs(self.low_high) / remaining_decks
-        if val >= 3:
-            self.low_high_out = sign * 3
-        elif val >= 2:
-            self.low_high_out = sign * 2
-        elif val >= 1:
-            self.low_high_out = sign * 1
-        else:
-            self.low_high_out = 0
-            
         if self.value > 21:
             self.state = (('bust', 0), 0)
         else:
-            self.state = ((self.value, self.aces), self.low_high_out)
+            self.state = ((self.value, self.aces), deck.low_high_out)
     
     def add_card(self,card):
         self.cards.append(card)        
@@ -128,12 +124,6 @@ class Hand:
         
         if card.rank=='Ace':
             self.aces+=1
-            
-        if values[card.rank] > 9:
-            self.low_high -= 1
-            
-        elif values[card.rank] < 7:
-            self.low_high += 1
         
     def adjust_for_ace(self, deck):
         while self.value > 21 and self.aces:
@@ -194,7 +184,7 @@ def train(max_iterations, n, learning_rate, greed, discount_factor):
         score = 0
         
         while True:
-            player_hand = Hand(n)
+            player_hand = Hand()
             player_hand.new_hand(deck)
             
             while playing:
@@ -203,6 +193,7 @@ def train(max_iterations, n, learning_rate, greed, discount_factor):
                     break
                 
                 state_index = get_ind[player_hand.state]
+                
                 if rand_vals[i] < greed:
                     #Take greedy action
                     best_action_val = np.argmax(Q_table[state_index])
@@ -217,7 +208,7 @@ def train(max_iterations, n, learning_rate, greed, discount_factor):
                     Q_curr = Q_table[state_index, action_int]
                     action_taken = action_int
                     
-                # Updating Q values - change to use high_low states
+                # Temporal Difference update adapted from https://www.geeksforgeeks.org/q-learning-in-python/
                 best_next_action = np.argmax(Q_table[state_index_new])
                 Q_future = Q_table[state_index_new, best_next_action]
                 td_target = reward + discount_factor * Q_future
@@ -241,7 +232,7 @@ def train(max_iterations, n, learning_rate, greed, discount_factor):
         
 def play(Q_table, n, num_plays):
     scores = np.zeros(num_plays)
-    for i in range(num_plays):
+    for i in tqdm(range(num_plays)):
         playing = True
         stand_interrupt = False
         deck = Deck(n)
@@ -249,7 +240,7 @@ def play(Q_table, n, num_plays):
         score = 0
         
         while True:
-            player_hand = Hand(n)
+            player_hand = Hand()
             player_hand.new_hand(deck)
             
             while playing:
@@ -284,11 +275,12 @@ max_iterations = 100000
 greed = 0.5
 discount_factor = 0.5
 learning_rate = 0.1         
-n = 3   
+n = 10
 Q_table = np.zeros((len(states3), 2))
 train(max_iterations, n, learning_rate, greed, discount_factor)          
 pd.options.display.float_format = '{:,.4f}'.format   
 q2 = pd.DataFrame({'states':states3,'hit':Q_table[:,0], 'stand':Q_table[:,1]})
 q2
-play(Q_table, 2, 10)
+score = play(Q_table, 100, 1000)
+score/100
 q2.to_csv('Q Table with count', sep = ',', float_format = '%.4f')
